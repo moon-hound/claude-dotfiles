@@ -1,0 +1,29 @@
+# Machine-specific state - never sync
+sessions/
+session-env/
+file-history/
+history.jsonl
+cache/
+paste-cache/
+backups/
+downloads/
+plans/
+shell-snapshots/
+tasks/
+ide/
+
+# Symlinks to other locations
+plugins
+settings.json
+
+# Temporary files
+*.tmp
+*.log
+.DS_Store
+
+# Local overrides
+*.local
+pre-icloud-backup-*
+mcp-needs-auth-cache.json
+.last-cleanup
+.claude-plugin/
