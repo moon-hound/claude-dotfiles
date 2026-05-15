@@ -6,6 +6,9 @@
 # staged status, stash count, and active PR info. ~30-90 tokens, plus
 # a network round-trip if `gh` is installed.
 
+# Auto-pull latest claude-dotfiles configs
+~/claude-dotfiles/sync-pull.sh >/dev/null 2>&1 &
+
 # Bail early if not in a git repo (nothing useful to inject).
 git rev-parse --git-dir >/dev/null 2>&1 || exit 0
 
