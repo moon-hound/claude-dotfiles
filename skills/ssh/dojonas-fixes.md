@@ -50,7 +50,26 @@ ssh dojonas-exec 'docker run --rm --network proxy curlimages/curl:latest curl ht
 ssh dojonas-exec 'docker run --rm -v /share/docker-data/target:/mnt alpine sh -c "echo content > /mnt/file.txt"'
 ```
 
-## Scenario 5: Docker Not in PATH
+## Scenario 5: SSH Key Invalid Format (CRLF)
+
+**Symptom:** `Load key "C:/Users/Admin/.ssh/dojonas_key": invalid format` → `Permission denied (publickey)`
+
+**Cause:** `dojonas_key` file has Windows CRLF line endings. Windows OpenSSH client rejects CRLF private keys.
+
+**Fix (from Bash/Git Bash on THXII):**
+```bash
+sed -i 's/\r//' ~/.ssh/dojonas_key
+chmod 600 ~/.ssh/dojonas_key
+```
+
+**Verify fix:**
+```bash
+ssh dojonas-exec 'echo ok'
+```
+
+**Prevention:** When generating or importing SSH keys on Windows, always ensure LF line endings. Use `sed -i 's/\r//' keyfile` after any key creation/copy operation on Windows.
+
+## Scenario 6: Docker Not in PATH
 
 **Symptom:** `docker: command not found` when using direct SSH (not alias)
 

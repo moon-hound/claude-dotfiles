@@ -1,0 +1,1 @@
+Deprecated 2026-09-20: superseded by SIMPLE_SYNC_REPOS in ~/.claude/workspaces/spacedog/scripts/claude-sync.py. Never actually wired into a live hook (session-start.sh that called sync-pull.sh only existed under .claude/hooks.backup/, not in active settings.json).

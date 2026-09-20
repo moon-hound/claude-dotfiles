@@ -11,6 +11,12 @@ fi
 INPUT=$(cat)
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
 
+# .mcp.json is a local-only secrets config file, never synced to git — skip scan
+FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
+if echo "$FILE_PATH" | grep -qE '\.mcp\.json$'; then
+  exit 0
+fi
+
 # Extract the content being written
 if [ "$TOOL_NAME" = "Write" ]; then
   CONTENT=$(echo "$INPUT" | jq -r '.tool_input.content // empty')

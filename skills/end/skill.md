@@ -105,3 +105,13 @@ Produce a single Markdown document using this structure:
 
 Save or paste this output into the Obsidian vault under the appropriate folder
 (e.g., `/Sessions/` or `/Build-Log/`).
+
+## Final Step: Compact
+
+After outputting the session note document, output exactly this line and nothing else:
+
+```
+▶ Run /compact to free context after saving this note.
+```
+
+The user must run `/compact` themselves — this cannot be automated. The reminder is mandatory.

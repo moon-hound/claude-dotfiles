@@ -98,6 +98,25 @@ ip link show wlan0
 sudo ip link set eth0 up
 ```
 
+## Scenario 6: SSH Key Invalid Format (CRLF)
+
+**Symptom:** `Load key "C:/Users/Admin/.ssh/id_ed25519_ha": invalid format` → `Permission denied (publickey,password)`
+
+**Cause:** `id_ed25519_ha` file has Windows CRLF line endings. Windows OpenSSH client rejects CRLF private keys.
+
+**Fix (from Bash/Git Bash on THXII):**
+```bash
+sed -i 's/\r//' ~/.ssh/id_ed25519_ha
+chmod 600 ~/.ssh/id_ed25519_ha
+```
+
+**Verify fix:**
+```bash
+ssh luiha 'echo ok'
+```
+
+**Note (2026-05-14):** Applied. Fix confirmed working.
+
 ## Full Diagnostic Check
 
 **Run from Mac (via Netbird):**

@@ -1,0 +1,598 @@
+#!/usr/bin/env python3
+"""Entity and device reference validator for Home Assistant configuration files.
+SOURCE: philippb/claude-homeassistant (carried verbatim)
+
+Validates that all entity/device/area references in configuration YAML files
+actually exist in the local registries pulled from the HA instance.
+
+Usage: python tools/reference_validator.py [config_dir]
+       Default config_dir: config/
+
+Pre-condition: requires config/.storage/ with core.entity_registry,
+core.device_registry, core.area_registry pulled from the HA instance.
+"""
+
+import json
+import re
+import sys
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, TypedDict
+
+import yaml
+
+
+class DomainSummary(TypedDict):
+    count: int
+    enabled: int
+    disabled: int
+    examples: List[str]
+
+
+class HAYamlLoader(yaml.SafeLoader):
+    pass
+
+
+def _make_constructor(tag):
+    def constructor(loader, node):
+        return f"{tag} {loader.construct_scalar(node)}"
+    return constructor
+
+
+for _tag in ["!include", "!include_dir_named", "!include_dir_merge_named",
+             "!include_dir_merge_list", "!include_dir_list", "!input", "!secret"]:
+    HAYamlLoader.add_constructor(_tag, _make_constructor(_tag))
+
+
+class ReferenceValidator:
+    SPECIAL_KEYWORDS = {"all", "none"}
+    _OBJECT_ID_RE = re.compile(r"^[a-z0-9_]+$")
+    BUILTIN_ENTITIES = {"sun.sun", "zone.home"}
+    BUILTIN_DOMAINS: set = set()
+
+    def __init__(self, config_dir: str = "config"):
+        self.config_dir = Path(config_dir)
+        self.storage_dir = self.config_dir / ".storage"
+        self.errors: List[str] = []
+        self.warnings: List[str] = []
+        self._entities: Optional[Dict[str, Any]] = None
+        self._devices: Optional[Dict[str, Any]] = None
+        self._areas: Optional[Dict[str, Any]] = None
+        self._restore_entities: Optional[Set[str]] = None
+
+    def load_entity_registry(self) -> Dict[str, Any]:
+        if self._entities is None:
+            registry_file = self.storage_dir / "core.entity_registry"
+            if not registry_file.exists():
+                self.errors.append(f"Entity registry not found: {registry_file}")
+                return {}
+            try:
+                with open(registry_file, "r") as f:
+                    data = json.load(f)
+                    self._entities = {
+                        entity["entity_id"]: entity
+                        for entity in data.get("data", {}).get("entities", [])
+                    }
+            except Exception as e:
+                self.errors.append(f"Failed to load entity registry: {e}")
+                return {}
+        return self._entities
+
+    def load_device_registry(self) -> Dict[str, Any]:
+        if self._devices is None:
+            registry_file = self.storage_dir / "core.device_registry"
+            if not registry_file.exists():
+                self.errors.append(f"Device registry not found: {registry_file}")
+                return {}
+            try:
+                with open(registry_file, "r") as f:
+                    data = json.load(f)
+                    self._devices = {
+                        device["id"]: device
+                        for device in data.get("data", {}).get("devices", [])
+                    }
+            except Exception as e:
+                self.errors.append(f"Failed to load device registry: {e}")
+                return {}
+        return self._devices
+
+    def load_area_registry(self) -> Dict[str, Any]:
+        if self._areas is None:
+            registry_file = self.storage_dir / "core.area_registry"
+            if not registry_file.exists():
+                self.warnings.append(f"Area registry not found: {registry_file}")
+                return {}
+            try:
+                with open(registry_file, "r") as f:
+                    data = json.load(f)
+                    self._areas = {
+                        area["id"]: area
+                        for area in data.get("data", {}).get("areas", [])
+                    }
+            except Exception as e:
+                self.warnings.append(f"Failed to load area registry: {e}")
+                return {}
+        return self._areas
+
+    def load_restore_state_entities(self) -> Set[str]:
+        if self._restore_entities is None:
+            restore_file = self.storage_dir / "core.restore_state"
+            if not restore_file.exists():
+                self._restore_entities = set()
+                return self._restore_entities
+            try:
+                with open(restore_file, "r", encoding="utf-8") as f:
+                    payload = json.load(f)
+            except Exception as e:
+                self.warnings.append(f"Failed to load restore state: {e}")
+                self._restore_entities = set()
+                return self._restore_entities
+            items = payload.get("data", [])
+            entities: Set[str] = set()
+            if isinstance(items, list):
+                for item in items:
+                    if not isinstance(item, dict):
+                        continue
+                    state = item.get("state")
+                    if not isinstance(state, dict):
+                        continue
+                    entity_id = state.get("entity_id")
+                    if isinstance(entity_id, str) and self._is_valid_entity_id(entity_id):
+                        entities.add(entity_id)
+            self._restore_entities = entities
+        return self._restore_entities
+
+    @classmethod
+    def _slugify_object_id(cls, value: str) -> str:
+        slug = value.strip().lower()
+        slug = re.sub(r"[^a-z0-9_]+", "_", slug)
+        slug = re.sub(r"_+", "_", slug)
+        return slug.strip("_")
+
+    @classmethod
+    def _is_valid_object_id(cls, value: str) -> bool:
+        return bool(cls._OBJECT_ID_RE.fullmatch(value))
+
+    @classmethod
+    def _is_valid_entity_id(cls, value: str) -> bool:
+        if "." not in value:
+            return False
+        domain, object_id = value.split(".", 1)
+        return (
+            bool(domain)
+            and cls._is_valid_object_id(domain)
+            and cls._is_valid_object_id(object_id)
+        )
+
+    def get_config_defined_entities(self) -> Set[str]:
+        entities: Set[str] = set()
+        entities.update(self.BUILTIN_ENTITIES)
+        entities.update(self._extract_groups())
+        entities.update(self._extract_from_configuration())
+        entities.update(self._extract_automation_entities())
+        entities.update(self._extract_script_entities())
+        entities.update(self._extract_scene_entities())
+        entities.update(self._extract_zone_entities())
+        return entities
+
+    def _extract_groups(self) -> Set[str]:
+        entities: Set[str] = set()
+        groups_file = self.config_dir / "groups.yaml"
+        if groups_file.exists():
+            try:
+                with open(groups_file, "r", encoding="utf-8") as f:
+                    data = yaml.load(f, Loader=HAYamlLoader)
+                    if isinstance(data, dict):
+                        for group_name in data.keys():
+                            if isinstance(group_name, str) and self._is_valid_object_id(group_name):
+                                entities.add(f"group.{group_name}")
+            except Exception:
+                pass
+        return entities
+
+    def _extract_from_configuration(self) -> Set[str]:
+        entities: Set[str] = set()
+        config_file = self.config_dir / "configuration.yaml"
+        if not config_file.exists():
+            return entities
+        try:
+            with open(config_file, "r", encoding="utf-8") as f:
+                data = yaml.load(f, Loader=HAYamlLoader)
+            if not isinstance(data, dict):
+                return entities
+            if "group" in data and isinstance(data["group"], dict):
+                for group_name in data["group"].keys():
+                    if isinstance(group_name, str) and self._is_valid_object_id(group_name):
+                        entities.add(f"group.{group_name}")
+            for input_type in ["input_boolean", "input_number", "input_text",
+                               "input_select", "input_datetime", "input_button"]:
+                if input_type in data and isinstance(data[input_type], dict):
+                    for name in data[input_type].keys():
+                        if isinstance(name, str) and self._is_valid_object_id(name):
+                            entities.add(f"{input_type}.{name}")
+            if "template" in data:
+                template_data = data["template"]
+                if isinstance(template_data, list):
+                    for item in template_data:
+                        entities.update(self._extract_template_entities(item))
+                elif isinstance(template_data, dict):
+                    entities.update(self._extract_template_entities(template_data))
+            for sensor_type in ["sensor", "binary_sensor"]:
+                if sensor_type in data:
+                    sensor_data = data[sensor_type]
+                    if isinstance(sensor_data, list):
+                        for item in sensor_data:
+                            if isinstance(item, dict) and item.get("platform") == "template":
+                                for name in item.get("sensors", {}).keys():
+                                    if isinstance(name, str) and self._is_valid_object_id(name):
+                                        entities.add(f"{sensor_type}.{name}")
+        except Exception:
+            pass
+        return entities
+
+    def _extract_template_entities(self, template_config: Any) -> Set[str]:
+        entities: Set[str] = set()
+        if not isinstance(template_config, dict):
+            return entities
+        for entity_type in ["sensor", "binary_sensor", "number", "select", "button"]:
+            if entity_type in template_config:
+                type_data = template_config[entity_type]
+                if isinstance(type_data, list):
+                    for item in type_data:
+                        if isinstance(item, dict):
+                            default_entity_id = item.get("default_entity_id")
+                            name = item.get("name", "")
+                            if default_entity_id:
+                                default_entity_id = str(default_entity_id)
+                                if "." in default_entity_id:
+                                    if self._is_valid_entity_id(default_entity_id):
+                                        entities.add(default_entity_id)
+                                elif self._is_valid_object_id(default_entity_id):
+                                    entities.add(f"{entity_type}.{default_entity_id}")
+                            elif name:
+                                object_id = self._slugify_object_id(str(name))
+                                if object_id:
+                                    entities.add(f"{entity_type}.{object_id}")
+        return entities
+
+    def _extract_automation_entities(self) -> Set[str]:
+        entities: Set[str] = set()
+        automations_file = self.config_dir / "automations.yaml"
+        if automations_file.exists():
+            try:
+                with open(automations_file, "r", encoding="utf-8") as f:
+                    data = yaml.load(f, Loader=HAYamlLoader)
+                    if isinstance(data, list):
+                        for automation in data:
+                            if isinstance(automation, dict):
+                                alias = automation.get("alias", "")
+                                if alias:
+                                    object_id = self._slugify_object_id(str(alias))
+                                    if object_id:
+                                        entities.add(f"automation.{object_id}")
+            except Exception:
+                pass
+        return entities
+
+    def _extract_script_entities(self) -> Set[str]:
+        entities: Set[str] = set()
+        scripts_file = self.config_dir / "scripts.yaml"
+        if scripts_file.exists():
+            try:
+                with open(scripts_file, "r", encoding="utf-8") as f:
+                    data = yaml.load(f, Loader=HAYamlLoader)
+                    if isinstance(data, dict):
+                        for script_name in data.keys():
+                            if isinstance(script_name, str) and self._is_valid_object_id(script_name):
+                                entities.add(f"script.{script_name}")
+            except Exception:
+                pass
+        return entities
+
+    def _extract_scene_entities(self) -> Set[str]:
+        entities: Set[str] = set()
+        scenes_file = self.config_dir / "scenes.yaml"
+        if scenes_file.exists():
+            try:
+                with open(scenes_file, "r", encoding="utf-8") as f:
+                    data = yaml.load(f, Loader=HAYamlLoader)
+                    if isinstance(data, list):
+                        for scene in data:
+                            if isinstance(scene, dict):
+                                name = scene.get("name", "")
+                                if name:
+                                    object_id = self._slugify_object_id(str(name))
+                                    if object_id:
+                                        entities.add(f"scene.{object_id}")
+            except Exception:
+                pass
+        return entities
+
+    def _extract_zone_entities(self) -> Set[str]:
+        entities: Set[str] = set()
+        config_file = self.config_dir / "configuration.yaml"
+        if config_file.exists():
+            try:
+                with open(config_file, "r", encoding="utf-8") as f:
+                    data = yaml.load(f, Loader=HAYamlLoader)
+                    if isinstance(data, dict) and "zone" in data:
+                        zone_data = data["zone"]
+                        if isinstance(zone_data, list):
+                            for zone in zone_data:
+                                if isinstance(zone, dict):
+                                    name = zone.get("name", "")
+                                    if name:
+                                        object_id = self._slugify_object_id(str(name))
+                                        if object_id:
+                                            entities.add(f"zone.{object_id}")
+            except Exception:
+                pass
+        zone_storage = self.storage_dir / "core.zone"
+        if zone_storage.exists():
+            try:
+                with open(zone_storage, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    for item in data.get("data", {}).get("items", []):
+                        if isinstance(item, dict):
+                            name = item.get("name", "")
+                            if name:
+                                object_id = self._slugify_object_id(str(name))
+                                if object_id:
+                                    entities.add(f"zone.{object_id}")
+            except Exception:
+                pass
+        return entities
+
+    def is_builtin_domain(self, entity_id: str) -> bool:
+        domain = entity_id.split(".")[0] if "." in entity_id else ""
+        return domain in self.BUILTIN_DOMAINS
+
+    def is_uuid_format(self, value: str) -> bool:
+        return bool(re.match(r"^[a-f0-9]{32}$", value))
+
+    def is_template(self, value: str) -> bool:
+        return bool(re.search(r"\{\{.*?\}\}", value))
+
+    def should_skip_entity_validation(self, value: str) -> bool:
+        return (
+            value.startswith("!")
+            or self.is_uuid_format(value)
+            or self.is_template(value)
+            or value in self.SPECIAL_KEYWORDS
+        )
+
+    def extract_entity_references(self, data: Any, path: str = "") -> Set[str]:
+        entities = set()
+        if isinstance(data, dict):
+            for key, value in data.items():
+                current_path = f"{path}.{key}" if path else key
+                if key in ["entity_id", "entity_ids", "entities"]:
+                    if isinstance(value, str):
+                        if not self.should_skip_entity_validation(value):
+                            entities.add(value)
+                    elif isinstance(value, list):
+                        for entity in value:
+                            if isinstance(entity, str) and not self.should_skip_entity_validation(entity):
+                                entities.add(entity)
+                elif key in ["device_id", "device_ids", "area_id", "area_ids"]:
+                    pass
+                elif key == "data" and isinstance(value, dict):
+                    entities.update(self.extract_entity_references(value, current_path))
+                elif isinstance(value, str) and any(x in value for x in ["state_attr(", "states(", "is_state("]):
+                    entities.update(self.extract_entities_from_template(value))
+                else:
+                    entities.update(self.extract_entity_references(value, current_path))
+        elif isinstance(data, list):
+            for i, item in enumerate(data):
+                entities.update(self.extract_entity_references(item, f"{path}[{i}]"))
+        return entities
+
+    def extract_entities_from_template(self, template: str) -> Set[str]:
+        entities = set()
+        patterns = [
+            r"states\('([^']+)'\)", r'states\("([^"]+)"\)',
+            r"states\.([a-zA-Z_][a-zA-Z0-9_]*\.[a-zA-Z_][a-zA-Z0-9_]*)",
+            r"is_state\('([^']+)'", r'is_state\("([^"]+)"',
+            r"state_attr\('([^']+)'", r'state_attr\("([^"]+)"',
+        ]
+        for pattern in patterns:
+            for match in re.findall(pattern, template):
+                if "." in match and len(match.split(".")) == 2:
+                    entities.add(match)
+        return entities
+
+    def extract_device_references(self, data: Any) -> Set[str]:
+        devices = set()
+        if isinstance(data, dict):
+            for key, value in data.items():
+                if key in ["device_id", "device_ids"]:
+                    if isinstance(value, str):
+                        if not value.startswith("!") and not self.is_template(value):
+                            devices.add(value)
+                    elif isinstance(value, list):
+                        for device in value:
+                            if isinstance(device, str) and not device.startswith("!") and not self.is_template(device):
+                                devices.add(device)
+                else:
+                    devices.update(self.extract_device_references(value))
+        elif isinstance(data, list):
+            for item in data:
+                devices.update(self.extract_device_references(item))
+        return devices
+
+    def extract_area_references(self, data: Any) -> Set[str]:
+        areas = set()
+        if isinstance(data, dict):
+            for key, value in data.items():
+                if key in ["area_id", "area_ids"]:
+                    if isinstance(value, str):
+                        if not value.startswith("!") and not self.is_template(value):
+                            areas.add(value)
+                    elif isinstance(value, list):
+                        for area in value:
+                            if isinstance(area, str) and not area.startswith("!"):
+                                areas.add(area)
+                else:
+                    areas.update(self.extract_area_references(value))
+        elif isinstance(data, list):
+            for item in data:
+                areas.update(self.extract_area_references(item))
+        return areas
+
+    def extract_entity_registry_ids(self, data: Any) -> Set[str]:
+        entity_registry_ids = set()
+        if isinstance(data, dict):
+            for key, value in data.items():
+                if key == "entity_id" and isinstance(value, str):
+                    if self.is_uuid_format(value):
+                        entity_registry_ids.add(value)
+                else:
+                    entity_registry_ids.update(self.extract_entity_registry_ids(value))
+        elif isinstance(data, list):
+            for item in data:
+                entity_registry_ids.update(self.extract_entity_registry_ids(item))
+        return entity_registry_ids
+
+    def get_entity_registry_id_mapping(self) -> Dict[str, str]:
+        entities = self.load_entity_registry()
+        return {
+            entity_data["id"]: entity_data["entity_id"]
+            for entity_data in entities.values()
+            if "id" in entity_data
+        }
+
+    def validate_file_references(self, file_path: Path) -> bool:
+        if file_path.name == "secrets.yaml":
+            return True
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                data = yaml.load(f, Loader=HAYamlLoader)
+        except Exception as e:
+            self.errors.append(f"{file_path}: Failed to load YAML - {e}")
+            return False
+        if data is None:
+            return True
+
+        entity_refs = self.extract_entity_references(data)
+        device_refs = self.extract_device_references(data)
+        area_refs = self.extract_area_references(data)
+        entity_registry_ids = self.extract_entity_registry_ids(data)
+
+        entities = self.load_entity_registry()
+        devices = self.load_device_registry()
+        areas = self.load_area_registry()
+        entity_id_mapping = self.get_entity_registry_id_mapping()
+        config_entities = self.get_config_defined_entities()
+        restore_entities = self.load_restore_state_entities()
+
+        all_valid = True
+
+        for entity_id in entity_refs:
+            if self.is_uuid_format(entity_id):
+                continue
+            if entity_id in entities:
+                if entities[entity_id].get("disabled_by") is not None:
+                    self.warnings.append(f"{file_path}: References disabled entity '{entity_id}'")
+                continue
+            if entity_id in config_entities:
+                continue
+            if self.is_builtin_domain(entity_id):
+                continue
+            if entity_id in restore_entities:
+                self.warnings.append(f"{file_path}: Entity '{entity_id}' not in registry but found in restore state")
+            self.errors.append(f"{file_path}: Unknown entity '{entity_id}'")
+            all_valid = False
+
+        for registry_id in entity_registry_ids:
+            if registry_id not in entity_id_mapping:
+                self.errors.append(f"{file_path}: Unknown entity registry ID '{registry_id}'")
+                all_valid = False
+            else:
+                actual_entity_id = entity_id_mapping[registry_id]
+                if actual_entity_id in entities:
+                    if entities[actual_entity_id].get("disabled_by") is not None:
+                        self.warnings.append(f"{file_path}: Entity registry ID '{registry_id}' references disabled entity '{actual_entity_id}'")
+
+        for device_id in device_refs:
+            if device_id not in devices:
+                self.errors.append(f"{file_path}: Unknown device '{device_id}'")
+                all_valid = False
+
+        for area_id in area_refs:
+            if area_id not in areas:
+                self.warnings.append(f"{file_path}: Unknown area '{area_id}'")
+
+        return all_valid
+
+    def get_yaml_files(self) -> List[Path]:
+        yaml_files: List[Path] = []
+        for pattern in ["*.yaml", "*.yml"]:
+            yaml_files.extend(self.config_dir.glob(pattern))
+        return yaml_files
+
+    def validate_all(self) -> bool:
+        if not self.config_dir.exists():
+            self.errors.append(f"Config directory {self.config_dir} does not exist")
+            return False
+        yaml_files = self.get_yaml_files()
+        if not yaml_files:
+            self.warnings.append("No YAML files found in config directory")
+            return True
+        all_valid = True
+        for file_path in yaml_files:
+            if not self.validate_file_references(file_path):
+                all_valid = False
+        return all_valid
+
+    def get_entity_summary(self) -> Dict[str, DomainSummary]:
+        entities = self.load_entity_registry()
+        summary: Dict[str, DomainSummary] = {}
+        for entity_id, entity_data in entities.items():
+            domain = entity_id.split(".")[0]
+            if domain not in summary:
+                summary[domain] = {"count": 0, "enabled": 0, "disabled": 0, "examples": []}
+            summary[domain]["count"] += 1
+            if entity_data.get("disabled_by") is None:
+                summary[domain]["enabled"] += 1
+            else:
+                summary[domain]["disabled"] += 1
+            if len(summary[domain]["examples"]) < 3:
+                summary[domain]["examples"].append(entity_id)
+        return summary
+
+    def print_results(self):
+        if self.errors:
+            print("ERRORS:")
+            for error in self.errors:
+                print(f"  ❌ {error}")
+            print()
+        if self.warnings:
+            print("WARNINGS:")
+            for warning in self.warnings:
+                print(f"  ⚠️  {warning}")
+            print()
+        summary = self.get_entity_summary()
+        if summary:
+            print("AVAILABLE ENTITIES BY DOMAIN:")
+            for domain, info in sorted(summary.items()):
+                print(f"  {domain}: {info['enabled']} enabled, {info['disabled']} disabled")
+                if info["examples"]:
+                    print(f"    Examples: {', '.join(info['examples'])}")
+            print()
+        if not self.errors and not self.warnings:
+            print("✅ All entity/device references are valid!")
+        elif not self.errors:
+            print("✅ Entity/device references are valid (with warnings)")
+        else:
+            print("❌ Invalid entity/device references found")
+
+
+def main():
+    config_dir = sys.argv[1] if len(sys.argv) > 1 else "config"
+    validator = ReferenceValidator(config_dir)
+    is_valid = validator.validate_all()
+    validator.print_results()
+    sys.exit(0 if is_valid else 1)
+
+
+if __name__ == "__main__":
+    main()

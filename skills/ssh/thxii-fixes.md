@@ -70,6 +70,41 @@ Restart-Service sshd
 Get-Service sshd | Select-Object Status, DisplayName
 ```
 
+## Scenario 5: known_hosts File Corrupted / Invalid
+
+**Symptom:** `Host key verification failed` for multiple machines at once; `ssh-keygen -R` reports "not a valid known_hosts file"
+
+**Cause:** PowerShell error output was accidentally appended to known_hosts in UTF-16 wide-char format, producing garbled bytes that make the entire file invalid.
+
+**Fix:**
+```powershell
+# Identify garbage (lines with spaced-out characters like "s s h - k e y s c a n")
+notepad $env:USERPROFILE\.ssh\known_hosts
+# Delete all garbage lines at end of file, save
+
+# OR: write a clean version from scratch, keeping only valid host entries
+```
+
+**If known_hosts is locked (can't write):**
+```bash
+# Write clean version to alternate file
+cp ~/.ssh/known_hosts /tmp/known_hosts_backup
+# Manually edit valid entries into a new file
+cat > ~/.ssh/known_hosts_clean << 'EOF'
+[paste valid lines here]
+EOF
+
+# Point SSH config at the clean file (add to top of ~/.ssh/config):
+# Host *
+#     UserKnownHostsFile C:/Users/Admin/.ssh/known_hosts_clean
+```
+
+**Note (2026-05-14):** Applied the clean-file workaround. `known_hosts_clean` is the active file via SSH config `Host *` block. Original `known_hosts` remained locked by sshd child processes. It can be replaced when sshd is restarted or during next Windows reboot.
+
+## Scenario 6: Running Claude Code on THXII itself
+
+**Note:** THXII (192.168.1.27) IS the Windows GPU workstation where Claude Code runs. If SSH is invoked from a Claude Code session and THXII appears as a target, we're already ON THXII — no SSH needed for local commands. Use PowerShell tool or Bash tool directly.
+
 ## Full Diagnostic Check
 
 **Run this to see current state of all settings:**

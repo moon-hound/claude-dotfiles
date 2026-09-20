@@ -1,0 +1,268 @@
+---
+name: new-session
+description: "Comprehensive session handover with detailed log, vault references, and continuation prompt. Preserves all work, research, findings, and mistakes for seamless continuation in next session."
+---
+
+# New Session Handover
+
+Create a comprehensive handover package for continuing work in a fresh session without losing any context, research, or findings.
+
+## Process
+
+1. **Create detailed session log** — Write comprehensive markdown document to `~/.claude/workspaces/spacedog/handover/sessions/[tag]-YYYY-MM-DD-HHMM-[slug].md` with ALL session details
+2. **Update handover entry** — Append/update entry in `~/.claude/workspaces/spacedog/handover/handover.md` (same as `/handover` command)
+3. **Generate continuation prompt** — Create ready-to-paste prompt with vault reading instructions and critical context
+4. **Report** — Show continuation prompt and confirm files written
+
+## Session Log Location
+
+```
+~/.claude/workspaces/spacedog/handover/sessions/[tag]-YYYY-MM-DD-HHMM-[slug].md
+```
+
+Session logs are synced via GitHub (part of claude-config repo) and available across all machines.
+
+## Session Log Format
+
+```markdown
+# [Hashtag] Session Log — YYYY-MM-DD HH:MM — [Descriptive Title]
+
+**Session ID:** [tag]-YYYY-MM-DD-HHMM
+**Status:** [emoji + status]
+**Duration:** [start - end time if known]
+
+---
+
+## Session Goal
+
+[What we were trying to accomplish. Include the "why" and any relevant background from prior sessions.]
+
+---
+
+## What Happened (Chronological)
+
+[Detailed narrative of what was attempted, in order. Include:
+- Commands run and their output (key parts)
+- Decisions made and why
+- Problems encountered
+- Solutions attempted
+- What worked and what didn't]
+
+### Step 1: [Description]
+- Action taken
+- Result
+- Key findings
+
+### Step 2: [Description]
+- Action taken
+- Result
+- Key findings
+
+[Continue for all major steps...]
+
+---
+
+## Critical Findings
+
+[Bullet list of the most important discoveries, confirmations, or learnings:]
+
+- **Finding 1:** Description + why it matters
+- **Finding 2:** Description + why it matters
+
+---
+
+## Mistakes Made (DO NOT REPEAT)
+
+[Explicit documentation of what went wrong and why, so next session avoids same errors:]
+
+- **Mistake 1:** What I did wrong + why it was wrong + correct approach
+- **Mistake 2:** What I did wrong + why it was wrong + correct approach
+
+---
+
+## Current State (End of Session)
+
+### What's Working
+- [Service/component]: Status + details
+
+### What's Broken
+- [Service/component]: Status + details + cause
+
+### What's Partially Done
+- [Task/feature]: What's complete + what's left
+
+---
+
+## Files Created/Modified
+
+### Created
+- [file path] — Description + purpose
+
+### Modified
+- [file path] — What changed + why
+
+### Important Locations
+- [file/directory path] — What's there + why it matters
+
+---
+
+## Key Commands/Techniques
+
+[Commands or techniques that worked and should be reused:]
+
+```bash
+# Description of what this does
+command here
+```
+
+---
+
+## Open Questions
+
+- **Question 1:** What needs to be answered + why it's blocking
+- **Question 2:** What needs to be answered + why it's blocking
+
+---
+
+## Next Session Priority Actions
+
+1. **[Action 1]** — Description + expected outcome + estimated time
+2. **[Action 2]** — Description + expected outcome + estimated time
+3. **[Action 3]** — Description + expected outcome + estimated time
+
+---
+
+## Blockers
+
+- [Blocker description] — What's blocked + potential solutions
+
+---
+
+## Related Context
+
+**Vault files to read:**
+- [file path in vault] — Why relevant
+
+**Prior session logs:**
+- [sessions/filename.md](sessions/filename.md) — What's in it
+
+**Related handover entries:**
+- [[#tag]] (DATE) — Brief description
+
+---
+
+## Raw Notes / Additional Context
+
+[Anything else that doesn't fit above but shouldn't be lost]
+
+---
+
+## Credentials / Secrets Referenced
+
+[Names/locations only, NEVER raw secrets]
+
+- ⚠️ [Credential name] in Bitwarden — Used for [purpose]
+```
+
+## Continuation Prompt Format
+
+The generated prompt should follow this template:
+
+```
+Continuing [#hashtag] from YYYY-MM-DD HH:MM session.
+
+**IMPORTANT: Read vault context FIRST before proceeding:**
+
+Required reading:
+1. Latest handover entry: ~/.claude/workspaces/spacedog/handover/handover.md (look for #[tag] — YYYY-MM-DD)
+2. Detailed session log: ~/.claude/workspaces/spacedog/handover/sessions/[filename].md
+3. Vault state file: ~/.claude/workspaces/spacedog/vault/spacedog-state.md
+4. [Any other specific vault files relevant to this work]
+
+Once you've read those files, here's where we are:
+
+## Critical Context
+
+[2-3 sentence summary of the situation]
+
+## What Works
+- [Key working component]
+
+## What's Broken
+- [Key broken component] + cause
+
+## Critical Rules from This Session
+
+[Rules that MUST be followed, especially "never do X" rules:]
+- [Rule 1 with specific reason]
+- [Rule 2 with specific reason]
+
+## First Actions
+
+1. [First thing to do] — Why/expected outcome
+2. [Second thing to do] — Why/expected outcome
+3. [Third thing to do] — Why/expected outcome
+
+## DO NOT:
+- [Specific thing to avoid] — Reason
+- [Specific thing to avoid] — Reason
+
+## User's First Question/Status Update
+
+[What should the next Claude ask the user to verify current state?]
+```
+
+## Rules
+
+1. **Be exhaustively detailed** — Session log should capture EVERYTHING so no work is lost. Include actual command output snippets, error messages, file paths, line numbers.
+
+2. **Separate facts from speculation** — Mark anything uncertain as "hypothesis" or "needs verification."
+
+3. **Prioritize mistakes** — The "DO NOT REPEAT" section is the most valuable. Be brutally honest about what went wrong.
+
+4. **Make vault references explicit** — List specific files to read with brief descriptions of what's in them.
+
+5. **Include all file changes** — Every file created or modified, with what changed and why.
+
+6. **Link everything** — Cross-reference between session log, handover entry, vault files, and related sessions.
+
+7. **Make continuation prompt self-contained** — Next Claude should be able to start with just the prompt + reading the files it mentions.
+
+8. **No secrets in logs** — Credential names/locations only, never raw values.
+
+9. **Timestamp everything** — When specific events happened, when services were restarted, when errors occurred.
+
+10. **Tag comprehensively** — Use all relevant hashtags in session log for future searchability.
+
+## Output
+
+After creating session log and updating handover:
+
+```
+✅ Session handover package created:
+
+📝 Session log: ~/.claude/workspaces/spacedog/handover/sessions/[filename].md ([size]KB)
+📋 Handover entry: Updated #[tag] — YYYY-MM-DD HH:MM in handover.md
+
+---
+
+🔄 CONTINUATION PROMPT (copy this to start next session):
+
+---
+
+[Full continuation prompt here]
+
+---
+
+Copy the prompt above and paste it into your next Claude Code session to continue with full context.
+```
+
+## Final Step: Compact
+
+After outputting the above, output exactly this line and nothing else:
+
+```
+▶ Run /compact now to free context. This session is fully preserved.
+```
+
+The user must run `/compact` themselves — this cannot be automated. The reminder is mandatory.
