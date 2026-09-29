@@ -12,7 +12,7 @@
 
 set -uo pipefail
 
-GATE_URL="http://127.0.0.1:8787/review"
+GATE_URL="${GATE_URL:-http://127.0.0.1:8787/review}"
 
 if ! command -v jq >/dev/null 2>&1; then
   exit 0
