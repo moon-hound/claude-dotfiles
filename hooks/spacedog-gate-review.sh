@@ -34,12 +34,12 @@ fi
 
 emit() {
   local decision="$1"
-  local reason="${2//\"/\\\"}"
+  local reason="${2:-}"
   if [ "$MODE" = "antigravity" ]; then
     if [ "$decision" = "allow" ] || [ -z "$reason" ]; then
-      printf '{"decision":"%s"}\n' "$decision"
+      jq -nc --arg d "$decision" '{"decision": $d}'
     else
-      printf '{"decision":"%s","reason":"%s"}\n' "$decision" "$reason"
+      jq -nc --arg d "$decision" --arg r "$reason" '{"decision": $d, "reason": $r}'
     fi
     exit 0
   else
@@ -48,7 +48,8 @@ emit() {
     if [ "$decision" = "allow" ]; then
       exit 0
     else
-      printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"%s","permissionDecisionReason":"%s"}}\n' "$decision" "$reason"
+      jq -nc --arg d "$decision" --arg r "$reason" \
+        '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":$d,"permissionDecisionReason":$r}}'
       exit 0
     fi
   fi
@@ -62,6 +63,9 @@ else
 fi
 
 [ -z "$FILE_PATH" ] && emit allow ""
+
+# Normalize relative or platform paths portably
+FILE_PATH=$(python3 -c "import os,sys; print(os.path.abspath(sys.argv[1]))" "$FILE_PATH" 2>/dev/null || python -c "import os,sys; print(os.path.abspath(sys.argv[1]))" "$FILE_PATH" 2>/dev/null || echo "$FILE_PATH")
 
 PAYLOAD=$(jq -n --arg path "$FILE_PATH" '{path: $path}')
 RESPONSE=$(curl -sS --max-time 2 -X POST "$GATE_URL" \
