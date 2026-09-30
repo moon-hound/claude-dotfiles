@@ -3,7 +3,9 @@
 # PreToolUse hook adapter for Claude Code and Antigravity.
 #
 # Contracts:
-# - Claude Code: outputs hookSpecificOutput JSON on stdout, exit 2 for ask/deny, exit 0 for allow.
+# - Claude Code: outputs hookSpecificOutput JSON on stdout, exit 0 always. Exit 2 is a hard
+#   unconditional block in Claude Code (ignores permissionDecision) -- never use it for "ask",
+#   only exit 0 + permissionDecision lets the user actually be prompted.
 # - Antigravity: outputs {"decision": "...", "reason": "..."} on stdout, exit 0.
 #
 # Fails open on any gate/network problem: this is an advisory
@@ -41,12 +43,13 @@ emit() {
     fi
     exit 0
   else
-    # Claude Code
+    # Claude Code: exit 0 always. Exit 2 would block unconditionally and skip
+    # the JSON entirely, so "ask" must ride on exit 0 to actually prompt the user.
     if [ "$decision" = "allow" ]; then
       exit 0
     else
       printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"%s","permissionDecisionReason":"%s"}}\n' "$decision" "$reason"
-      exit 2
+      exit 0
     fi
   fi
 }
