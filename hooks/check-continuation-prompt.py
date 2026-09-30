@@ -22,15 +22,18 @@ def last_assistant_text(transcript_path):
         pass
     return text
 
+HEADER_RE = re.compile(r"^\s*(#{1,6}\s*|\*\*)?CONTINUATION PROMPT(\*\*)?\s*:?\s*$", re.MULTILINE)
+
 def has_unfenced_continuation_prompt(text):
-    if "CONTINUATION PROMPT" not in text:
+    match = HEADER_RE.search(text)
+    if not match:
         return False
-    after = text.split("CONTINUATION PROMPT", 1)[1]
+    after = text[match.end():]
     fence = after.find("```")
     if fence == -1:
         return True
-    # anything other than blank lines/heading markers between the label and the fence means it's not immediately fenced
-    between = after[:fence].strip().strip("#").strip(":").strip()
+    # anything other than blank lines between the header and the fence means it's not immediately fenced
+    between = after[:fence].strip()
     return between != ""
 
 def main():
