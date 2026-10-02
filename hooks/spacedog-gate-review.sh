@@ -59,11 +59,26 @@ emit() {
   fi
 }
 
-# Extract target file path depending on agent payload format
+# Extract target file path + proposed new content depending on agent payload
+# format. NEW_CONTENT feeds the gate's mechanical signature-diff check; if it
+# can't be determined (unknown field names, ambiguous Edit match), it's left
+# empty and the gate just skips that check -- fails open, same as everything
+# else in this script.
 if [ "$MODE" = "antigravity" ]; then
   FILE_PATH=$(printf '%s' "$INPUT" | jq -r '.toolCall.args.TargetFile // .toolCall.args.file_path // .toolCall.args.path // empty' 2>/dev/null || true)
+  NEW_CONTENT=$(printf '%s' "$INPUT" | jq -r '.toolCall.args.CodeContent // .toolCall.args.Content // .toolCall.args.content // .toolCall.args.TargetContent // empty' 2>/dev/null || true)
+  NEW_STRING=""
 else
+  TOOL_NAME=$(printf '%s' "$INPUT" | jq -r '.tool_name // empty' 2>/dev/null || true)
   FILE_PATH=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null || true)
+  if [ "$TOOL_NAME" = "Write" ]; then
+    NEW_CONTENT=$(printf '%s' "$INPUT" | jq -r '.tool_input.content // empty' 2>/dev/null || true)
+    NEW_STRING=""
+  else
+    NEW_CONTENT=""
+    OLD_STRING=$(printf '%s' "$INPUT" | jq -r '.tool_input.old_string // empty' 2>/dev/null || true)
+    NEW_STRING=$(printf '%s' "$INPUT" | jq -r '.tool_input.new_string // empty' 2>/dev/null || true)
+  fi
 fi
 
 [ -z "$FILE_PATH" ] && emit allow ""
@@ -71,7 +86,32 @@ fi
 # Normalize relative or platform paths portably
 FILE_PATH=$(python3 -c "import os,sys; print(os.path.abspath(sys.argv[1]))" "$FILE_PATH" 2>/dev/null || python -c "import os,sys; print(os.path.abspath(sys.argv[1]))" "$FILE_PATH" 2>/dev/null || echo "$FILE_PATH")
 
-PAYLOAD=$(jq -n --arg path "$FILE_PATH" '{path: $path}')
+# An Edit (old_string/new_string patch, not full content) -- reconstruct the
+# resulting file text by applying the patch to the current on-disk content.
+# Base64-encoded in transit: old/new strings can contain quotes, backslashes,
+# and newlines that would otherwise be mangled crossing the shell/python
+# boundary.
+if [ -z "$NEW_CONTENT" ] && [ -n "$NEW_STRING" ] && [ -f "$FILE_PATH" ]; then
+  OLD_B64=$(printf '%s' "$OLD_STRING" | base64 | tr -d '\n')
+  NEW_B64=$(printf '%s' "$NEW_STRING" | base64 | tr -d '\n')
+  NEW_CONTENT=$(python3 -c "
+import sys, base64
+path = sys.argv[1]
+old = base64.b64decode(sys.argv[2]).decode('utf-8', 'replace')
+new = base64.b64decode(sys.argv[3]).decode('utf-8', 'replace')
+try:
+    content = open(path, encoding='utf-8').read()
+except OSError:
+    sys.exit(1)
+if content.count(old) == 1:
+    sys.stdout.write(content.replace(old, new, 1))
+else:
+    sys.exit(1)
+" "$FILE_PATH" "$OLD_B64" "$NEW_B64" 2>/dev/null || true)
+fi
+
+PAYLOAD=$(jq -n --arg path "$FILE_PATH" --arg content "$NEW_CONTENT" \
+  'if $content == "" then {path: $path} else {path: $path, new_content: $content} end')
 RESPONSE=$(curl -sS --max-time 2 -X POST "$GATE_URL" \
   -H 'Content-Type: application/json' \
   -d "$PAYLOAD" 2>/dev/null) || emit allow ""
