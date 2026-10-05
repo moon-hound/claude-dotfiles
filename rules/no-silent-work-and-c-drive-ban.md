@@ -16,4 +16,6 @@
 **NEVER save project files, training data, intermediate tensors, scratch models, or assets to the C: drive.**
 * The C: drive is the host operating system drive and must NEVER be loaded with heavy working data, machine learning features, audio slices, or project artifacts.
 * **Primary Project Storage:** Always use the designated project folder on `L:\Projects\Active\<project-hashtag-name>\` (e.g. `L:\Projects\Active\lui-voice\`).
+  * *Network Path (dojoNAS):* When working from background environments on THXII, access this directly at `/share/lunacloud/Projects/Active/<project-hashtag-name>/` on `dojoNAS` (`192.168.1.234`) via passwordless SSH/SFTP using `dojonas_key` (`admin@192.168.1.234`).
 * **Heavy Compute / Intermediate Scratch:** If a job produces multi-gigabyte temporary feature tensors (like `microWakeWord` spectrograms or Docker volume caches), they must be directed to designated high-capacity project/storage paths, NEVER to `C:\`.
+
