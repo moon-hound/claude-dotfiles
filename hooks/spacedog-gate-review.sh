@@ -34,14 +34,11 @@ fi
 
 emit() {
   local decision="$1"
-  local reason="${2//\"/\\\"}"
   local reason="${2:-}"
   if [ "$MODE" = "antigravity" ]; then
     if [ "$decision" = "allow" ] || [ -z "$reason" ]; then
-      printf '{"decision":"%s"}\n' "$decision"
       jq -nc --arg d "$decision" '{"decision": $d}'
     else
-      printf '{"decision":"%s","reason":"%s"}\n' "$decision" "$reason"
       jq -nc --arg d "$decision" --arg r "$reason" '{"decision": $d, "reason": $r}'
     fi
     exit 0
@@ -51,7 +48,6 @@ emit() {
     if [ "$decision" = "allow" ]; then
       exit 0
     else
-      printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"%s","permissionDecisionReason":"%s"}}\n' "$decision" "$reason"
       jq -nc --arg d "$decision" --arg r "$reason" \
         '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":$d,"permissionDecisionReason":$r}}'
       exit 0
