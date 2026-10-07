@@ -14,7 +14,7 @@
 
 set -uo pipefail
 
-GATE_URL="${GATE_URL:-http://127.0.0.1:8787/review}"
+GATE_URL="${GATE_URL:-http://192.168.1.234:8787/review}"
 
 if ! command -v jq >/dev/null 2>&1; then
   exit 0
@@ -108,10 +108,13 @@ if content.count(old) == 1:
 else:
     sys.exit(1)
 " "$FILE_PATH" "$OLD_B64" "$NEW_B64" 2>/dev/null || true)
+OLD_CONTENT=""
+if [ -n "$NEW_CONTENT" ] && [ -f "$FILE_PATH" ]; then
+  OLD_CONTENT=$(cat "$FILE_PATH" 2>/dev/null || true)
 fi
 
-PAYLOAD=$(jq -n --arg path "$FILE_PATH" --arg content "$NEW_CONTENT" \
-  'if $content == "" then {path: $path} else {path: $path, new_content: $content} end')
+PAYLOAD=$(jq -n --arg path "$FILE_PATH" --arg content "$NEW_CONTENT" --arg old "$OLD_CONTENT" \
+  '{path: $path} + (if $content != "" then {new_content: $content} else {} end) + (if $old != "" then {old_content: $old} else {} end)')
 RESPONSE=$(curl -sS --max-time 2 -X POST "$GATE_URL" \
   -H 'Content-Type: application/json' \
   -d "$PAYLOAD" 2>/dev/null) || emit allow ""
