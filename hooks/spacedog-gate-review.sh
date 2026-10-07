@@ -108,6 +108,8 @@ if content.count(old) == 1:
 else:
     sys.exit(1)
 " "$FILE_PATH" "$OLD_B64" "$NEW_B64" 2>/dev/null || true)
+fi
+
 OLD_CONTENT=""
 if [ -n "$NEW_CONTENT" ] && [ -f "$FILE_PATH" ]; then
   OLD_CONTENT=$(cat "$FILE_PATH" 2>/dev/null || true)
