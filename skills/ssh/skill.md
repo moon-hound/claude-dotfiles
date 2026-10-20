@@ -1,3 +1,8 @@
+---
+name: ssh
+description: Diagnose and fix SSH connection issues to THXII, dojoNAS, and luiHA.
+---
+
 # /ssh — Diagnose and Fix SSH Connection Issues
 
 Quick diagnostics and fixes for SSH connection problems to THXII and other machines.
