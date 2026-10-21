@@ -17,3 +17,4 @@ Removed:
 - ubiquitous-language -> .agents/skills/ubiquitous-language
 - zoom-out -> .agents/skills/zoom-out
 grill-with-docs -> .agents/skills/grill-with-docs (junction removed, real folder untouched, 0 invocations found standalone — overlaps grill-me)
+handoff -> .agents/skills/handoff (junction removed, real folder untouched; kept thin but real 2-use tool separate from handover rather than merging — per user decision)
