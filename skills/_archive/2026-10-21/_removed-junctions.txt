@@ -16,3 +16,4 @@ Removed:
 - request-refactor-plan -> .agents/skills/request-refactor-plan
 - ubiquitous-language -> .agents/skills/ubiquitous-language
 - zoom-out -> .agents/skills/zoom-out
+grill-with-docs -> .agents/skills/grill-with-docs (junction removed, real folder untouched, 0 invocations found standalone — overlaps grill-me)
