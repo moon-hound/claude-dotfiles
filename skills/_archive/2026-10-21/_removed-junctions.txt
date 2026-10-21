@@ -1,0 +1,18 @@
+These items were junctions (not real folders) in claude-dotfiles/skills/,
+pointing to C:\Users\Admin\.agents\skills\<name>\ (shared with Antigravity).
+
+Removing the junction only unlinks them from Claude Code — the real folders
+at .agents/skills/ are untouched and still work for Antigravity.
+
+Confirmed 0 invocations by this skill in 74 session transcripts (AI Setup Audit, 2026-10-21).
+To restore Claude Code access: recreate the junction, e.g.
+  New-Item -ItemType Junction -Path "C:\Users\Admin\claude-dotfiles\skills\tdd" -Target "C:\Users\Admin\.agents\skills\tdd"
+
+Removed:
+- tdd -> .agents/skills/tdd
+- teach -> .agents/skills/teach
+- design-an-interface -> .agents/skills/design-an-interface
+- improve-codebase-architecture -> .agents/skills/improve-codebase-architecture
+- request-refactor-plan -> .agents/skills/request-refactor-plan
+- ubiquitous-language -> .agents/skills/ubiquitous-language
+- zoom-out -> .agents/skills/zoom-out
