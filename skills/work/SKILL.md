@@ -1,7 +1,4 @@
----
-name: work
-description: Execute prioritized work items from the canonical spacedog roadmap.
----
+# /work — Roadmap Execution Session
 
 Execute prioritized work items from the canonical spacedog roadmap.
 
@@ -129,8 +126,8 @@ Even in autonomous mode:
 [10:15] T1-1 verified shipped, marked completed, roadmap updated
 [10:15] T1-3 marked in_progress
 [10:25] T1-3 shipped, marked completed, roadmap updated
-[10:25] Standing item marked in_progress
-[10:30] Standing item complete, roadmap updated
+[10:25] Standing item: camofox labels marked in_progress
+[10:30] Camofox wired, marked completed, roadmap updated
 [10:32] Handover updated, summary posted
 ```
 

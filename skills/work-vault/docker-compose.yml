@@ -1,0 +1,23 @@
+version: '3.8'
+
+services:
+  personal-assistant:
+    build: .
+    image: personal-assistant:latest
+    container_name: personal-assistant
+    volumes:
+      - ~/work-vault:/work-vault:rw
+    environment:
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - SENTRY_DSN=${SENTRY_DSN}
+      - VERSION=${VERSION:-unknown}
+    restart: unless-stopped
+    ports:
+      - "8000:8000"  # Metrics endpoint
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/personal-assistant.health && test $(($(date +%s) - $(cat /tmp/personal-assistant.health))) -lt 30"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
