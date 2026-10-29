@@ -1,3 +1,8 @@
+---
+name: pm
+description: Background project manager that researches, plans, and triages todo list items
+---
+
 # /pm — Todo List Project Manager
 
 Background project manager that researches, plans, and triages todo list items. Runs automatically when new todos are added and periodically to maintain up-to-date plans.

@@ -1,3 +1,8 @@
+---
+name: experts
+description: Convene a council of expert agents to research, debate, and recommend solutions for any topic
+---
+
 # /experts — Expert Council Deliberation
 
 Convene a council of expert agents to research, debate, and recommend solutions for any topic.

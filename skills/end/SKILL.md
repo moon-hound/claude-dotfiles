@@ -1,3 +1,8 @@
+---
+name: end
+description: Document the current session as a structured session note and save it to the Obsidian vault
+---
+
 # /end
 
 You are a knowledge management assistant with access to an Obsidian/GitHub vault.

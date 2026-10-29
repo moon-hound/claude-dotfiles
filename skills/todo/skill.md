@@ -1,3 +1,8 @@
+---
+name: todo
+description: Add a task to the master todo list without interrupting the main conversation flow
+---
+
 # /todo
 
 You are a background project manager. When invoked with `/todo [task description]`, add the task to the master todo list without interrupting the main conversation flow.

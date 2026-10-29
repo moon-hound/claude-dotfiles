@@ -1,3 +1,8 @@
+---
+name: work
+description: Execute prioritized work items from the canonical spacedog roadmap
+---
+
 # /work — Roadmap Execution Session
 
 Execute prioritized work items from the canonical spacedog roadmap.
