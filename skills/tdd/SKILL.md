@@ -1,70 +1,42 @@
 ---
 name: tdd
-description: Test-Driven Development loop. Write a failing test first, then the minimum code to pass it, then refactor. Repeat.
-argument-hint: "[feature description or function signature]"
+description: "Use only when the user explicitly asks for TDD, a failing test, or a regression test, OR when the bug has an obvious cheap local test target. Skip when the test path is unclear, expensive, integration-heavy, or not requested."
 disable-model-invocation: true
 ---
 
-Build the following using strict Test-Driven Development:
+# TDD Bug Fix
 
-**Feature**: $ARGUMENTS
+When fixing a bug with a clear, cheap test path, make the broken behavior executable before changing production code. The goal is a focused regression test that fails before the fix and passes after it.
 
-## The TDD Cycle
+Do not force a test when it would be impractical. If the available test would require broad harness setup, brittle mocks, slow end-to-end infrastructure, production-only state, vague reproduction steps, or large unrelated fixture churn, skip adding a new test and use the closest useful verification instead.
 
-Repeat this cycle for each behavior. Never skip steps.
+## Workflow
 
-### Red: Write a Failing Test
+1. **Understand the bug.** Identify the intended behavior, current behavior, affected path, and smallest observable reproduction.
+2. **Choose the narrowest executable check.** Prefer the closest unit, component, integration, or regression test already used for that codepath. If no practical test path is obvious, do not create one from scratch just to satisfy the workflow.
+3. **Write the failing test first.** Add the smallest focused test that would have caught the bug. The test should encode intended behavior, not mirror the current implementation.
+4. **Run the new test before fixing.** Confirm it fails for the intended reason. If it passes or fails for an unrelated reason, correct the test or reproduction before editing the implementation.
+5. **Fix the bug.** Make the smallest production change that satisfies the intended behavior while preserving nearby contracts.
+6. **Rerun the regression test.** Confirm the test now passes.
 
-1. Write ONE test for the smallest next behavior (not the whole feature)
-2. The test must:
-   - Describe the behavior in its name: `should return 0 for empty cart`
-   - Use Arrange-Act-Assert structure
-   - Assert specific values, not vague truths
-3. **Run the test. It MUST fail.** If it passes, either:
-   - The behavior already exists (skip to the next behavior)
-   - The test is wrong (it's not testing what you think. Fix it)
-4. Verify the failure message makes sense. It should tell you what's missing
+## If a Failing Test Is Impractical
 
-### Green: Write the Minimum Code to Pass
+Use the closest executable regression check instead: a targeted script, manual reproduction command, browser automation, snapshot comparison, log assertion, or focused integration check.
 
-1. Write the **simplest, most obvious code** that makes the failing test pass
-2. Don't generalize. Don't make it elegant. Don't handle cases the test doesn't cover.
-3. Hardcoding is fine if only one test exists for that path. The next test will force generalization
-4. **Run the test. It MUST pass.** If it doesn't, fix the code (not the test. The test defined the behavior)
-5. Run ALL tests. Nothing previously passing should break.
+Prefer no new test over a bad test. A bad test is one that mostly tests mocks, encodes current implementation details, depends on timing or unrelated global state, needs expensive infrastructure for a small fix, or would be deleted immediately after proving the fix.
 
-### Refactor: Clean Up Without Changing Behavior
+## Guardrails
 
-1. Look for: duplication, unclear names, functions doing too much, magic values
-2. Make ONE improvement at a time
-3. **Run ALL tests after each change.** If anything breaks, undo immediately.
-4. Stop refactoring when the code is clean enough. Don't gold-plate
+- Do not change tests merely to match a wrong implementation.
+- Do not weaken existing assertions unless the expected behavior has genuinely changed and the reason is clear.
+- Keep the regression test focused on the bug. Avoid broad fixture churn or unrelated coverage expansion.
+- If the bug is flaky, make the test deterministic where possible and document the signal being locked down.
+- If the bug exposes a broader class of failures, first land the focused regression path, then consider additional sibling coverage.
 
-## Choosing What to Test Next
+## Final Response
 
-Work from simple to complex:
-1. **Degenerate cases**. Null input, empty collection, zero
-2. **Happy path**. The simplest valid input
-3. **Variations**. Different valid inputs that exercise different branches
-4. **Edge cases**. Boundary values, max sizes, special characters
-5. **Error cases**. Invalid input, failures, exceptions
-6. **Integration**. How this connects to the rest of the system
+Report the evidence, not just the outcome:
 
-Each test should require a small code change. If you need to write more than ~10 lines of production code to pass a test, the test is too big. Split it.
-
-## Rules
-
-- **Never write production code without a failing test that demands it.**
-- **Never write more than one failing test at a time.** One red → green → refactor cycle at a time.
-- **The test drives the design.** If the code is hard to test, the design is wrong. Change the design, not the test approach.
-- **Don't mock what you own.** If you need to mock your own code to test it, the code needs restructuring.
-- **Commit after each green+refactor cycle.** Small, passing, meaningful commits.
-
-## Output
-
-After each cycle, briefly state:
-- **Test**: what behavior was added
-- **Code**: what changed to make it pass
-- **Refactor**: what was cleaned up (or "none needed")
-
-When the feature is complete, provide a summary of all behaviors covered and any gaps that would need integration or manual testing.
+- Name the failing-before test or executable check and the failure it produced.
+- Name the passing-after test run and any nearby validation performed.
+- If failing-before evidence could not be demonstrated, state why and describe the closest regression check used instead.
