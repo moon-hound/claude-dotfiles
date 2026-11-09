@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: experts
 description: Convene a council of expert agents to research, debate, and recommend solutions for any topic
 ---

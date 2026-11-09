@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: todo
 description: Add a task to the master todo list without interrupting the main conversation flow
 ---

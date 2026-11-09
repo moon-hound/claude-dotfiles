@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: work
 description: Execute prioritized work items from the canonical spacedog roadmap
 ---

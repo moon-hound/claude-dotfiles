@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: end
 description: Document the current session as a structured session note and save it to the Obsidian vault
 ---
