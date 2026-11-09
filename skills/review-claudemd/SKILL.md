@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: review-claudemd
 description: Review recent conversations to find improvements for CLAUDE.md files.
 ---

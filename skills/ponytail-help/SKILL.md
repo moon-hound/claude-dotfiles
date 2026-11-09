@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: ponytail-help
 description: >
   Quick reference for ponytail levels, skills and commands. One-shot display.

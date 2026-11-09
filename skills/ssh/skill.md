@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: ssh
 description: Diagnose and fix SSH connection issues to THXII, dojoNAS, and luiHA.
 ---

@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: simplify
 description: "Run multi-pass simplification on active code edits: enforces Ponytail YAGNI standards, strips AI fluff with unslop, removes redundant comments, and verifies tests still pass."
 ---

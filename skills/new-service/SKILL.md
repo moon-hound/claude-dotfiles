@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: new-service
 description: Scaffold a new self-hosted Docker Compose service for spacedog. Generates a compose snippet, Traefik labels, Authelia middleware config, .env.example, and a vault stub. Use whenever adding a new containerized service to dojoNAS.
 ---

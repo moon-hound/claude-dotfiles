@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: home-assistant-best-practices
 description: >
   Best practices for HA automations, helpers, scripts, and dashboards.

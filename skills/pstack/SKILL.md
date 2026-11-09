@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: pstack
 description: >-
   Lauren Tan (@poteto)'s pstack engineering suite for eliminating AI slop, enforcing

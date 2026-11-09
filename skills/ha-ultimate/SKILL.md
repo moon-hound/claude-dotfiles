@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: ha-ultimate
 description: >
   Manage a Home Assistant instance end-to-end: discover entities, write modern

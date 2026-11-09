@@ -1,4 +1,5 @@
 ---
+disable-model-invocation: true
 name: evaluate
 description: >
   Structured UX evaluation that ranks specific issues by severity and states
